@@ -55,29 +55,15 @@
     const GRAVITY = 0.15;
     let gravityOn = true;
     let unraveling = false;
+    let unravelIdx = -1;
     window.addEventListener('keydown', (e) => {
       if (e.key === 'f' || e.key === 'F') {
         gravityOn = !gravityOn;
         if (gravityOn && !unraveling) {
           unraveling = true;
           hint.style.opacity = '0';
-          // Unlock letters from the tail end, one every few frames
-          let nextUnlock = letters.length - 1;
-          // Find first still-locked from the tail
-          while (nextUnlock >= 0 && !letters[nextUnlock].locked) nextUnlock--;
-          function unravelStep() {
-            if (!gravityOn || nextUnlock < 0) { unraveling = false; return; }
-            for (let j = 0; j < 1 && nextUnlock >= 0; j++) {
-              if (letters[nextUnlock].locked) {
-                letters[nextUnlock].locked = false;
-                letters[nextUnlock].px = letters[nextUnlock].x;
-                letters[nextUnlock].py = letters[nextUnlock].y - 0.5;
-              }
-              nextUnlock--;
-            }
-            requestAnimationFrame(unravelStep);
-          }
-          unravelStep();
+          unravelIdx = letters.length - 1;
+          while (unravelIdx >= 0 && !letters[unravelIdx].locked) unravelIdx--;
         }
       }
     });
@@ -309,6 +295,19 @@
 
     // Physics
     function simulate() {
+      // Unravel step (one letter per fixed tick)
+      if (unraveling) {
+        if (!gravityOn || unravelIdx < 0) { unraveling = false; }
+        else if (letters[unravelIdx].locked) {
+          letters[unravelIdx].locked = false;
+          letters[unravelIdx].px = letters[unravelIdx].x;
+          letters[unravelIdx].py = letters[unravelIdx].y - 0.5;
+          unravelIdx--;
+        } else {
+          unravelIdx--;
+        }
+      }
+
       // Unlock propagation
       for (let i = letters.length - 2; i >= 0; i--) {
         if (letters[i].locked && !letters[i + 1].locked) {
@@ -402,8 +401,23 @@
       }
     }
 
-    function render() {
-      simulate();
+    // Fixed-timestep loop: simulate at 60Hz regardless of display refresh rate
+    const FIXED_DT = 1 / 60;
+    const MAX_STEPS = 4; // cap to avoid spiral of death
+    let accumulator = 0;
+    let lastTime = -1;
+
+    function render(now) {
+      if (lastTime < 0) { lastTime = now; requestAnimationFrame(render); return; }
+      const dt = Math.min((now - lastTime) / 1000, MAX_STEPS * FIXED_DT);
+      lastTime = now;
+      accumulator += dt;
+
+      while (accumulator >= FIXED_DT) {
+        simulate();
+        accumulator -= FIXED_DT;
+      }
+
       for (let i = 0; i < letters.length; i++) {
         if (!letters[i].locked) els[i].classList.add('draggable');
         els[i].style.transform = `translate(${letters[i].x}px, ${letters[i].y}px)`;
