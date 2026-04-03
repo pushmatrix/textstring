@@ -14,7 +14,7 @@ python3 -m http.server 8000
 
 Add these 2 lines : 
 
-#  import { prepareWithSegments, layoutWithLines } from './pretext.js';
+import { prepareWithSegments, layoutWithLines } from './pretext.js';
 
 After the   <script type="module"> Section
 
